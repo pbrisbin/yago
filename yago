@@ -1,0 +1,215 @@
+#!/bin/bash
+#
+# Yet Another GetOpt. pbrisbin 2011
+#
+###
+
+# since output is being eval'd, printing error messages would be
+# nonsensical. instead, we'll export ERRSTR and return 1 so that the
+# caller can print it on our behalf. TODO this still doesn't really work
+# since the exit status is hidden inside eval...
+#errorout() { export ERRSTR="$*"; exit 1; }
+errorout() { echo "error: $*" >&2; exit 1; }
+
+# parse the option definition into two arrays and one array for each
+# option
+set_values() { # {{{
+  local parse_info arg n
+
+  local long_opt short_opt opt_message default nargs argument \
+    variable required
+
+  sopts_list=()
+  lopts_list=()
+
+  for arg in "${opts[@]}"; do
+    IFS=',' read -a parse_info <<< "$arg"
+    n="${#parse_info[@]}"
+
+    [[ $n -lt 3 || $n -gt 7 ]] && errorout 'invalid number of tokens in option definiton'
+
+    # todo: trim whitespace more efficiently
+    long_opt=$(   echo ${parse_info[0]})
+    short_opt=$(  echo ${parse_info[1]})
+    opt_message=$(echo ${parse_info[2]})
+
+    [[ $n -ge 4 ]] && default=$( echo ${parse_info[3]}) || default=false
+    [[ $n -ge 5 ]] && nargs=$(   echo ${parse_info[4]}) || nargs=0
+    [[ $n -ge 6 ]] && argument=$(echo ${parse_info[5]}) || argument='<ARG>'
+    [[ $n -ge 7 ]] && variable=$(echo ${parse_info[6]}) || variable="$long_opt"
+
+    [[ -n "$default" && "$default" != 'REQUIRED' ]] && required=false || required=true
+
+    [[ "$nargs" != 'N' && -n "${nargs//[0-9]/}" ]] && errorout "invalid number of arguments, token was \`$nargs'"
+
+    # add to a list of keys
+    sopts_list[$short_opt]="$long_opt"
+    lopts_list[$long_opt]="$short_opt"
+
+    # create an "extension table" of parameters, last field is "seen"
+    eval "$long_opt=( \"$short_opt\" \"$opt_message\" \"$default\" \"$nargs\" \"$argument\" \"$variable\" $required false)"
+
+    # clear variables for next option
+    unset long_opt
+    unset short_opt
+    unset opt_message
+    unset default
+    unset nargs
+    unset argument
+    unset variable
+    unset required
+  done
+} # }}}
+
+# TODO rewrite this using the arrays created by the new version of
+# set_values
+#help_message() { # {{{
+  #local usage opt lopt arg list
+
+  #list=()
+
+  #for arg in "${opts[@]}"; do
+    #set_values "$arg"
+    
+    #case "$nargs" in
+      #'N') opt="-$short_opt $argument ..."
+           #lopt="-$long_opt $argument ..." ;;
+      #'1') opt="-$short_opt $argument"
+           #lopt="-$long_opt $argument"     ;;
+      #*)   opt="-$short_opt"
+           #lopt="-$long_opt"               ;;
+    #esac
+
+    #$required || opt="[ $opt ]" 
+
+    #usage+=" $opt"
+    #list+=( "$(printf "    %-25.25s %s" "-${short_opt}, --$lopt" "$opt_message")" )
+  #done
+
+  #echo "usage: $progname $usage"
+  #printf "%s\n" "${list[@]}"
+  #exit 1
+#} # }}}
+
+declare -a opts
+declare -a optargs
+declare -a output
+
+declare -A sopts_list
+declare -A lopts_list
+
+# store the program name to be used by the help message as well as the
+# string we need to parse into the options structures.
+progname="$1"; shift
+ifs=$IFS; IFS=$'\n' opts=( $1 ); IFS=$ifs; shift;
+
+# set two key value arrays which map valid long to short options and
+# valid short to long options (to make lookups either way convenient) as
+# well as an array named for each long option which holds all of the
+# information about it: short opt, message, default, required, etc.
+set_values
+
+# this variable will be used to track how many option arguments we're
+# looking for to determine if we've not seen enough or if we've seen too
+# many. if the option is declared as taking N arguments, this value is
+# ignored during most of these validations
+nargs=0
+
+while [[ -n "$1" ]]; do
+  case "$1" in
+    # the simplest cases
+    -h|--help) help_message ;;
+    --)        shift; break ;;
+
+    --*) # new long option seen. see if we were collecting arguments,
+         # and if we've seen enough; if all's well setup the process to
+         # operate on this option
+
+      if [[ "$nargs" == 'N' ]]; then
+        if [[ "${#optargs[@]}" -ne 0 ]]; then
+          output+=( "$lopt=( $(printf '"%s" ' "${optargs[@]}"))" ) 
+          eval "$lopt[3]=true"
+        else
+          missing_argument "$lopt"
+        fi
+      else
+        [[ $nargs -ne 0 ]] && missing_argument "$lopt"
+        # TODO -gt is missing_argument, -lt means extra_argument
+      fi
+
+      unset lopt sopt
+      optargs=()
+      lopt="${1/--/}"
+      sopt="${lopts_list[$lopt]}" ;;
+
+    
+    -*) # new short option seen. run the same argument checks and begin 
+        # processing for this argument
+
+      if [[ "$nargs" == 'N' ]]; then
+        if [[ "${#optargs[@]}" -ne 0 ]]; then
+          output+=( "$lopt=( $(printf '"%s" ' "${optargs[@]}"))" ) 
+          eval "$lopt[7]=true"
+        else
+          missing_argument "$lopt"
+        fi
+      else
+        [[ $nargs -ne 0 ]] && missing_argument "$lopt"
+        # TODO -gt is missing_argument, -lt means extra_argument
+      fi
+
+      unset lopt sopt
+      optargs=()
+      sopt="${1/-/}"
+      lopt="${sopts_list[$sopt]}"  ;;
+
+    *) # option argument. collect it as an option argument if that's
+       # appropriate and continue so we stop processing this value as an
+       # option. if it's an extra argument, stop processing entirely.
+      if [[ "$nargs" == 'N' ]]; then
+        optargs+=( "$1" )
+      elif [[ $nargs -eq 0 ]]; then
+        break
+      else
+        # add to args list and decrement counter
+        optargs+=( "$1" )
+        nargs=$((nargs-1))
+
+        # see if we've gotten all the args we need, if so add this
+        # variable's definition to the output and mark it as seen
+        if [[ $nargs -eq 0 ]]; then 
+          # TODO -lt means extra_argument
+          output+=( "$lopt=( $(printf '"%s" ' "${optargs[@]}"))" )
+          eval "$lopt[7]=true"
+        fi
+      fi
+
+      # don't setup options parsing, continue and look for the next
+      # argument or option
+      shift; continue; ;;
+  esac
+  shift
+
+  # both will be known at this point, else it was an invalid option.
+  [[ -n "$sopt" && -n "$lopt" ]] || invalid_option "$1"
+
+  # see how many arguments this option needs
+  eval "nargs=\${$lopt[3]}"
+
+  # initial nargs of 0 means boolean flag, add it to the output and set
+  # the flag as seen
+  if [[ "$nargs" != 'N' && $nargs -eq 0 ]]; then
+    output+=( "$lopt=true" )
+    eval "$lopt[7]=true"
+  fi
+done
+
+# roll through any options we haven't seen yet. if they're required
+# throw an error, otherwise set them to the default value and add to the
+# output array
+# TODO
+
+# print the code to be eval'd including any unprocessed arguments as an
+# args array
+printf "%s\n" "${output[@]}"
+[[ "$#" -ne 0 ]] && echo "args=( $(printf '"%s" ' "$@"))"
