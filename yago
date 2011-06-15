@@ -4,12 +4,15 @@
 #
 ###
 
-# since output is being eval'd, printing error messages would be
-# nonsensical. instead, we'll export ERRSTR and return 1 so that the
-# caller can print it on our behalf. TODO this still doesn't really work
-# since the exit status is hidden inside eval...
-#errorout() { export ERRSTR="$*"; exit 1; }
-errorout() { echo "error: $*" >&2; exit 1; }
+errorout() { # {{{
+  ERRNO=$1; shift
+  ERRSTR="$*"
+  
+  export ERRNO
+  export ERRSTR
+  
+  echo "yago: error: $ERRSTR" >&2; exit $ERRNO;
+} # }}}
 
 # parse the option definition into two arrays and one array for each
 # option
@@ -26,7 +29,7 @@ set_values() { # {{{
     IFS=',' read -a parse_info <<< "$arg"
     n="${#parse_info[@]}"
 
-    [[ $n -lt 3 || $n -gt 7 ]] && errorout 'invalid number of tokens in option definiton'
+    [[ $n -lt 3 || $n -gt 7 ]] && errorout 1 'invalid number of tokens in option definiton'
 
     # todo: trim whitespace more efficiently
     long_opt=$(   echo ${parse_info[0]})
@@ -40,7 +43,7 @@ set_values() { # {{{
 
     [[ -n "$default" && "$default" != 'REQUIRED' ]] && required=false || required=true
 
-    [[ "$nargs" != 'N' && -n "${nargs//[0-9]/}" ]] && errorout "invalid number of arguments, token was \`$nargs'"
+    [[ "$nargs" != 'N' && -n "${nargs//[0-9]/}" ]] && errorout 1 "invalid number of arguments, token was \`$nargs'"
 
     # add to a list of keys
     sopts_list[$short_opt]="$long_opt"
