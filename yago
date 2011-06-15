@@ -9,14 +9,11 @@ errorout() { # {{{
   echo "error: $*" >&2; exit $errno
 } # }}}
 
-# error handlers
 invalid_option()   { errorout 2 "invalid option $1"      ; }
 duplicate_option() { errorout 3 "duplicate option $1 "   ; }
 missing_argument() { errorout 4 "missing argument for $1"; }
 extra_argument()   { errorout 5 "extra argument for $1"  ; }
 
-# parse the option definition into two arrays and one array for each
-# option
 set_values() { # {{{
   local parse_info arg n
 
@@ -67,35 +64,12 @@ set_values() { # {{{
   done
 } # }}}
 
-# TODO rewrite this using the arrays created by the new version of
-# set_values
-#help_message() { # {{{
-  #local usage opt lopt arg list
-
-  #list=()
-
-  #for arg in "${opts[@]}"; do
-    #set_values "$arg"
-    
-    #case "$nargs" in
-      #'N') opt="-$short_opt $argument ..."
-           #lopt="-$long_opt $argument ..." ;;
-      #'1') opt="-$short_opt $argument"
-           #lopt="-$long_opt $argument"     ;;
-      #*)   opt="-$short_opt"
-           #lopt="-$long_opt"               ;;
-    #esac
-
-    #$required || opt="[ $opt ]" 
-
-    #usage+=" $opt"
-    #list+=( "$(printf "    %-25.25s %s" "-${short_opt}, --$lopt" "$opt_message")" )
-  #done
-
-  #echo "usage: $progname $usage"
-  #printf "%s\n" "${list[@]}"
-  #exit 1
-#} # }}}
+help_message() { # {{{
+  # TODO, fix this
+  echo "usage: $progname ..." >&2
+  echo "exit 1"
+  exit 0
+} # }}}
 
 setup_short_opt() { # {{{
   sopt="${1/-/}"
@@ -122,12 +96,12 @@ consume_args() { # {{{
     nseen=$((nseen+1))
     if [[ "$nexpd" != 'N' ]]; then
       [[ $nseen -eq $nexpd ]] && return $nseen
-      [[ $nseen -gt $nexpd ]] && extra_argument "$lopt"
+      [[ $nseen -gt $nexpd ]] && extra_argument "--$lopt"
     fi
   done
 
   # if we get here and it's not an N option, we didn't get enough
-  [[ "$nexpd" != 'N' ]] && missing_argument "$lopt"
+  [[ "$nexpd" != 'N' ]] && missing_argument "--$lopt"
 
   return $nseen
 } # }}}
@@ -163,9 +137,7 @@ while [[ -n "$1" ]]; do
   eval "nargs=\${$lopt[3]}"
 
   if [[ "$nargs" != 'N' && $nargs -eq 0 ]]; then
-    # boolean flag
     output+=( "$lopt=true" )
-    declare $lopt[7]=true
   else
     # fill optargs and return the number of arguments which were
     # consumed by the process. error on too few or too many
@@ -173,10 +145,10 @@ while [[ -n "$1" ]]; do
     ret=$?
 
     output+=( "$lopt=( $(printf '"%s" ' "${optargs[@]}"))" )
-    declare $lopt[7]=true
-
     shift $ret # move passed
   fi
+
+  declare $lopt[7]=true
 
   unset nargs
   unset ret
