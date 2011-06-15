@@ -13,6 +13,7 @@ errorout() { # {{{
 invalid_option()   { errorout 2 "invalid option $1"      ; }
 duplicate_option() { errorout 3 "duplicate option $1 "   ; }
 missing_argument() { errorout 4 "missing argument for $1"; }
+extra_argument()   { errorout 5 "extra argument for $1"  ; }
 
 # parse the option definition into two arrays and one array for each
 # option
@@ -113,7 +114,22 @@ setup_long_opt() { # {{{
 } # }}}
 
 consume_args() { # {{{
+  local nexpd="$1" nseen=0; shift
 
+  while [[ -n "$1" && ! "$1" =~ -.* ]]; do
+    optargs+=( "$1" ); shift
+
+    nseen=$((nseen+1))
+    if [[ "$nexpd" != 'N' ]]; then
+      [[ $nseen -eq $nexpd ]] && return $nseen
+      [[ $nseen -gt $nexpd ]] && extra_argument "$lopt"
+    fi
+  done
+
+  # if we get here and it's not an N option, we didn't get enough
+  [[ "$nexpd" != 'N' ]] && missing_argument "$lopt"
+
+  return $nseen
 } # }}}
 
 declare -a opts
@@ -126,8 +142,7 @@ declare -A lopts_list
 # store the program name to be used by the help message as well as the
 # string we need to parse into the options structures.
 progname="$1"; shift
-#ifs=$IFS; IFS=$'\n' opts=( $1 ); IFS=$ifs; shift;
-{ IFS=$'\n' opts=( $1 ); shift; } # this may not work
+ifs=$IFS; IFS=$'\n' opts=( $1 ); IFS=$ifs; shift;
 
 # set two key value arrays which map valid long to short options and
 # valid short to long options (to make lookups either way convenient) as
@@ -135,19 +150,13 @@ progname="$1"; shift
 # information about it: short opt, message, default, required, etc.
 set_values
 
-# this variable will be used to track how many option arguments we're
-# looking for to determine if we've not seen enough or if we've seen too
-# many. if the option is declared as taking N arguments, this value is
-# ignored during most of these validations
-nargs=0
-
 while [[ -n "$1" ]]; do
   case "$1" in
     -h|--help) help_message         ;;
     --)        shift; break         ;;
-    --*)       setup_long_opt "$1"  ;;
+    --*)       setup_long_opt  "$1" ;;
     -*)        setup_short_opt "$1" ;;
-    *)         break ;; # extra argument
+    *)         break ;; # unconsumed arg
   esac
   shift
 
@@ -156,25 +165,29 @@ while [[ -n "$1" ]]; do
   if [[ "$nargs" != 'N' && $nargs -eq 0 ]]; then
     # boolean flag
     output+=( "$lopt=true" )
-    eval "$lopt[7]=true"
-    shift
+    declare $lopt[7]=true
   else
     # fill optargs and return the number of arguments which were
     # consumed by the process. error on too few or too many
-    consume_args "$nargs" "$@"; then
-    output+=( "$lopt=( $(printf '"$s" ' "${optargs[@]}"))" )
-    eval "$lopt[7]=true"
-    shift $?
+    consume_args "$nargs" "$@"
+    ret=$?
+
+    output+=( "$lopt=( $(printf '"%s" ' "${optargs[@]}"))" )
+    declare $lopt[7]=true
+
+    shift $ret # move passed
   fi
 
+  unset nargs
+  unset ret
   unset lopt
   unset sopt
   optargs=()
 done
 
-# TODO roll through any options we haven't seen yet. if they're required
-# throw an error, otherwise set them to the default value and add to the
-# output array
+# TODO: roll through any options we haven't seen yet. if they're
+# required throw an error, otherwise set them to the default value and
+# add to the output array
 
 printf "%s\n" "${output[@]}" # code to be eval'd
 [[ "$#" -ne 0 ]] && echo "args=( $(printf '"%s" ' "$@"))"
