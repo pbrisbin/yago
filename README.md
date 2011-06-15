@@ -109,9 +109,7 @@ output="$(yago 'testprog' "$opts" "$@")" && eval "$output" || handle_error
 where `handle_error` does whatever you need, or simply `exit`s.
 
 `yago`'s `stdout` can be silenced if you want to print your own errors. 
-The message it *would* print (minus the "yago: error: " prefix) will be 
-exported as `$ERRSTR` for your use. The non-zero exit status is also 
-exported as `$ERRNO` in case that's useful too.
+The non-zero exit status is meaningful (a list will be added here soon).
 
 Note: when `yago` sees an `-h` or `--help` option, it will print the 
 help message on `stderr`, "exit 1" on `stdout`, and still exits with a 

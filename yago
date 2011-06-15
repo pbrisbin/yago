@@ -5,14 +5,8 @@
 ###
 
 errorout() { # {{{
-  ERRNO=$1; shift
-  ERRSTR="$*"
-  
-  # these don't seem to be available to the caller :/
-  export ERRNO
-  export ERRSTR
-  
-  echo "yago: error: $ERRSTR" >&2; exit $ERRNO;
+  local errno=$1; shift
+  echo "error: $*" >&2; exit $errno
 } # }}}
 
 # error handlers
@@ -126,6 +120,7 @@ set_values
 # ignored during most of these validations
 nargs=0
 
+# parsing {{{
 while [[ -n "$1" ]]; do
   case "$1" in
     # the simplest cases
@@ -224,7 +219,9 @@ while [[ -n "$1" ]]; do
     eval "$lopt[7]=true"
   fi
 done
+# }}}
 
+# post processing {{{
 if [[ "${#optargs[@]}" -ne 0 ]]; then
   if [[ "$nargs" != 'N' && $nargs -eq 0 ]]; then
     output+=( "$lopt=( $(printf '"%s" ' "${optargs[@]}"))" )
@@ -237,6 +234,8 @@ fi
 # throw an error, otherwise set them to the default value and add to the
 # output array
 # TODO
+
+# }}}
 
 # print the code to be eval'd including any unprocessed arguments as an
 # args array
