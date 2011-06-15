@@ -133,6 +133,7 @@ while [[ -n "$1" ]]; do
       if [[ "$nargs" == 'N' ]]; then
         if [[ "${#optargs[@]}" -ne 0 ]]; then
           output+=( "$lopt=( $(printf '"%s" ' "${optargs[@]}"))" ) 
+          optargs=()
           eval "$lopt[3]=true"
         else
           missing_argument "$lopt"
@@ -154,6 +155,7 @@ while [[ -n "$1" ]]; do
       if [[ "$nargs" == 'N' ]]; then
         if [[ "${#optargs[@]}" -ne 0 ]]; then
           output+=( "$lopt=( $(printf '"%s" ' "${optargs[@]}"))" ) 
+          optargs=()
           eval "$lopt[7]=true"
         else
           missing_argument "$lopt"
@@ -185,6 +187,7 @@ while [[ -n "$1" ]]; do
         if [[ $nargs -eq 0 ]]; then 
           # TODO -lt means extra_argument
           output+=( "$lopt=( $(printf '"%s" ' "${optargs[@]}"))" )
+          optargs=()
           eval "$lopt[7]=true"
         fi
       fi
@@ -210,9 +213,11 @@ while [[ -n "$1" ]]; do
 done
 
 if [[ "${#optargs[@]}" -ne 0 ]]; then
+  if [[ $nargs -eq 0 ]]; then
+    output+=( "$lopt=( $(printf '"%s" ' "${optargs[@]}"))" )
+    eval "$lopt[7]=true"
+  fi
   # TODO check for not enough or too many
-  output+=( "$lopt=( $(printf '"%s" ' "${optargs[@]}"))" )
-  eval "$lopt[7]=true"
 fi
 
 # roll through any options we haven't seen yet. if they're required
