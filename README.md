@@ -114,7 +114,7 @@ exported as `$ERRSTR` for your use. The non-zero exit status is also
 exported as `$ERRNO` in case that's useful too.
 
 Note: when `yago` sees an `-h` or `--help` option, it will print the 
-help message on `stdout`, "exit 1" on `stdout`, and still exits with a 
+help message on `stderr`, "exit 1" on `stdout`, and still exits with a 
 **zero** status itself. This will show the message to the user and tell 
 your program to go ahead and `eval "exit 1"` to terminate.
 
