@@ -8,11 +8,17 @@ errorout() { # {{{
   ERRNO=$1; shift
   ERRSTR="$*"
   
+  # these don't seem to be available to the caller :/
   export ERRNO
   export ERRSTR
   
   echo "yago: error: $ERRSTR" >&2; exit $ERRNO;
 } # }}}
+
+# error handlers
+invalid_option()   { errorout 2 "invalid option $1"      ; }
+duplicate_option() { errorout 3 "duplicate option $1 "   ; }
+missing_argument() { errorout 4 "missing argument for $1"; }
 
 # parse the option definition into two arrays and one array for each
 # option
@@ -136,10 +142,10 @@ while [[ -n "$1" ]]; do
           optargs=()
           eval "$lopt[3]=true"
         else
-          missing_argument "$lopt"
+          missing_argument "--$lopt"
         fi
       else
-        [[ $nargs -ne 0 ]] && missing_argument "$lopt"
+        [[ $nargs -ne 0 ]] && missing_argument "--$lopt"
         # TODO -gt is missing_argument, -lt means extra_argument
       fi
 
@@ -148,7 +154,8 @@ while [[ -n "$1" ]]; do
       lopt="${1/--/}"
       sopt="${lopts_list[$lopt]}"
 
-      eval "\${$lopt[7]}" && duplicate_option "$lopt"
+      [[ -z "$sopt" ]]    && invalid_option "--$lopt"
+      eval "\${$lopt[7]}" && duplicate_option "--$lopt"
 
       ;;
 
@@ -162,10 +169,10 @@ while [[ -n "$1" ]]; do
           optargs=()
           eval "$lopt[7]=true"
         else
-          missing_argument "$lopt"
+          missing_argument "--$lopt"
         fi
       else
-        [[ $nargs -ne 0 ]] && missing_argument "$lopt"
+        [[ $nargs -ne 0 ]] && missing_argument "--$lopt"
         # TODO -gt is missing_argument, -lt means extra_argument
       fi
 
@@ -174,7 +181,8 @@ while [[ -n "$1" ]]; do
       sopt="${1/-/}"
       lopt="${sopts_list[$sopt]}"
 
-      eval "\${$lopt[7]}" && duplicate_option "$sopt"
+      [[ -z "$lopt" ]]    && invalid_option "-$sopt"
+      eval "\${$lopt[7]}" && duplicate_option "-$sopt"
 
       ;;
 
@@ -205,9 +213,6 @@ while [[ -n "$1" ]]; do
       shift; continue; ;;
   esac
   shift
-
-  # both will be known at this point, else it was an invalid option.
-  [[ -n "$sopt" && -n "$lopt" ]] || invalid_option "$1"
 
   # see how many arguments this option needs
   eval "nargs=\${$lopt[3]}"
