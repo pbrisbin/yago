@@ -146,7 +146,11 @@ while [[ -n "$1" ]]; do
       unset lopt sopt
       optargs=()
       lopt="${1/--/}"
-      sopt="${lopts_list[$lopt]}" ;;
+      sopt="${lopts_list[$lopt]}"
+
+      eval "\${$lopt[7]}" && duplicate_option "$lopt"
+
+      ;;
 
     
     -*) # new short option seen. run the same argument checks and begin 
@@ -168,7 +172,11 @@ while [[ -n "$1" ]]; do
       unset lopt sopt
       optargs=()
       sopt="${1/-/}"
-      lopt="${sopts_list[$sopt]}"  ;;
+      lopt="${sopts_list[$sopt]}"
+
+      eval "\${$lopt[7]}" && duplicate_option "$sopt"
+
+      ;;
 
     *) # option argument. collect it as an option argument if that's
        # appropriate and continue so we stop processing this value as an
