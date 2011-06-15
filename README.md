@@ -16,6 +16,9 @@ an automatic help message.
 
 ### Terse usage
 
+*Note: I need to rewrite this section re: the new use of stderr, stdout, 
+and exit statuses. For now, see the Example section.*
+
 The idea is to define your script's options and their nature in a single 
 string. Newlines are used to separate options and commas are used to 
 separate the different attributes of each option.
@@ -30,7 +33,7 @@ This option is a simple boolean flag. Passing `--some_flag` or `-s` to
 your script should result in the variable `$some_flag` being set to
 `true` when you `eval` the output of `yago 'myprog' "$opts" "$@"`.
 
-Passing `-h` or `--help` would print
+Passing `-h` or `--help` to your script would print
 
 ~~~ 
 usage: myprog [ -s ]
@@ -54,9 +57,9 @@ Whitespace is trimmed so you're free to align things as desired. Be sure
 to escape any commas or newlines that you do not want to signify an 
 option or attribute delimitation.
 
-This version defines 4 options.
+This version defines 3 options.
 
-The second line introduces a special value in the default field. 
+The second definition introduces a special value in the default field. 
 `REQUIRED` means that no default is present because the flag requires 
 its arguments be specified. Defining `REQUIRED` for an option that takes 
 no arguments is dumb, but should be safe.
@@ -92,7 +95,32 @@ elsewhere, processing stops and the remaining values are placed in an
 
 ### Example
 
-Given the above option string, the following call:
+The script uses `stderr` for information and error messages, `stdout` 
+for printing strings that should be `eval`d by your program, and a 
+non-zero exit status to signal that you should **not** `eval` the output 
+but rather exit or otherwise handle some error.
+
+Therefore, typical usage would be:
+
+~~~ { .bash }
+output="$(yago 'testprog' "$opts" "$@")" && eval "$output" || handle_error
+~~~
+
+where `handle_error` does whatever you need, or simply `exit`s.
+
+`yago`'s `stdout` can be silenced if you want to print your own errors. 
+The message it *would* print (minus the "yago: error: " prefix) will be 
+exported as `$ERRSTR` for your use. The non-zero exit status is also 
+exported as `$ERRNO` in case that's useful too.
+
+Note: when `yago` sees an `-h` or `--help` option, it will print the 
+help message on `stdout`, "exit 1" on `stdout`, and still exits with a 
+**zero** status itself. This will show the message to the user and tell 
+your program to go ahead and `eval "exit 1"` to terminate.
+
+*Not all of this is implemented yet, but that's the idea*
+
+So, given our example option string, the following call:
 
 ~~~ { .bash }
 ./yago 'testprog' "$opts" -f foo bar -s 10 -q some extra args
