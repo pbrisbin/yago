@@ -96,6 +96,26 @@ set_values() { # {{{
   #exit 1
 #} # }}}
 
+setup_short_opt() { # {{{
+  sopt="${1/-/}"
+  lopt="${sopts_list[$sopt]}"
+
+  [[ -z "$lopt" ]]    && invalid_option "-$sopt"
+  eval "\${$lopt[7]}" && duplicate_option "-$sopt"
+} # }}}
+
+setup_long_opt() { # {{{
+  lopt="${1/--/}"
+  sopt="${lopts_list[$lopt]}"
+
+  [[ -z "$sopt" ]]    && invalid_option "--$lopt"
+  eval "\${$lopt[7]}" && duplicate_option "--$lopt"
+} # }}}
+
+consume_args() { # {{{
+
+} # }}}
+
 declare -a opts
 declare -a optargs
 declare -a output
@@ -106,7 +126,8 @@ declare -A lopts_list
 # store the program name to be used by the help message as well as the
 # string we need to parse into the options structures.
 progname="$1"; shift
-ifs=$IFS; IFS=$'\n' opts=( $1 ); IFS=$ifs; shift;
+#ifs=$IFS; IFS=$'\n' opts=( $1 ); IFS=$ifs; shift;
+{ IFS=$'\n' opts=( $1 ); shift; } # this may not work
 
 # set two key value arrays which map valid long to short options and
 # valid short to long options (to make lookups either way convenient) as
@@ -120,126 +141,42 @@ set_values
 # ignored during most of these validations
 nargs=0
 
-# parsing {{{
 while [[ -n "$1" ]]; do
   case "$1" in
-    # the simplest cases
-    -h|--help) help_message ;;
-    --)        shift; break ;;
-
-    --*) # new long option seen. see if we were collecting arguments,
-         # and if we've seen enough; if all's well setup the process to
-         # operate on this option
-
-      if [[ "$nargs" == 'N' ]]; then
-        if [[ "${#optargs[@]}" -ne 0 ]]; then
-          output+=( "$lopt=( $(printf '"%s" ' "${optargs[@]}"))" ) 
-          optargs=()
-          eval "$lopt[3]=true"
-        else
-          missing_argument "--$lopt"
-        fi
-      else
-        [[ $nargs -ne 0 ]] && missing_argument "--$lopt"
-        # TODO -gt is missing_argument, -lt means extra_argument
-      fi
-
-      unset lopt sopt
-      optargs=()
-      lopt="${1/--/}"
-      sopt="${lopts_list[$lopt]}"
-
-      [[ -z "$sopt" ]]    && invalid_option "--$lopt"
-      eval "\${$lopt[7]}" && duplicate_option "--$lopt"
-
-      ;;
-
-    
-    -*) # new short option seen. run the same argument checks and begin 
-        # processing for this argument
-
-      if [[ "$nargs" == 'N' ]]; then
-        if [[ "${#optargs[@]}" -ne 0 ]]; then
-          output+=( "$lopt=( $(printf '"%s" ' "${optargs[@]}"))" ) 
-          optargs=()
-          eval "$lopt[7]=true"
-        else
-          missing_argument "--$lopt"
-        fi
-      else
-        [[ $nargs -ne 0 ]] && missing_argument "--$lopt"
-        # TODO -gt is missing_argument, -lt means extra_argument
-      fi
-
-      unset lopt sopt
-      optargs=()
-      sopt="${1/-/}"
-      lopt="${sopts_list[$sopt]}"
-
-      [[ -z "$lopt" ]]    && invalid_option "-$sopt"
-      eval "\${$lopt[7]}" && duplicate_option "-$sopt"
-
-      ;;
-
-    *) # option argument. collect it as an option argument if that's
-       # appropriate and continue so we stop processing this value as an
-       # option. if it's an extra argument, stop processing entirely.
-      if [[ "$nargs" == 'N' ]]; then
-        optargs+=( "$1" )
-      elif [[ $nargs -eq 0 ]]; then
-        break
-      else
-        # add to args list and decrement counter
-        optargs+=( "$1" )
-        nargs=$((nargs-1))
-
-        # see if we've gotten all the args we need, if so add this
-        # variable's definition to the output and mark it as seen
-        if [[ $nargs -eq 0 ]]; then 
-          # TODO -lt means extra_argument
-          output+=( "$lopt=( $(printf '"%s" ' "${optargs[@]}"))" )
-          optargs=()
-          eval "$lopt[7]=true"
-        fi
-      fi
-
-      # don't setup options parsing, continue and look for the next
-      # argument or option
-      shift; continue; ;;
+    -h|--help) help_message         ;;
+    --)        shift; break         ;;
+    --*)       setup_long_opt "$1"  ;;
+    -*)        setup_short_opt "$1" ;;
+    *)         break ;; # extra argument
   esac
   shift
 
-  # see how many arguments this option needs
   eval "nargs=\${$lopt[3]}"
 
-  # initial nargs of 0 means boolean flag, add it to the output and set
-  # the flag as seen
   if [[ "$nargs" != 'N' && $nargs -eq 0 ]]; then
+    # boolean flag
     output+=( "$lopt=true" )
     eval "$lopt[7]=true"
-  fi
-done
-# }}}
-
-# post processing {{{
-if [[ "${#optargs[@]}" -ne 0 ]]; then
-  if [[ "$nargs" != 'N' && $nargs -eq 0 ]]; then
-    output+=( "$lopt=( $(printf '"%s" ' "${optargs[@]}"))" )
+    shift
+  else
+    # fill optargs and return the number of arguments which were
+    # consumed by the process. error on too few or too many
+    consume_args "$nargs" "$@"; then
+    output+=( "$lopt=( $(printf '"$s" ' "${optargs[@]}"))" )
     eval "$lopt[7]=true"
+    shift $?
   fi
-  # TODO check for not enough or too many
-fi
 
-# roll through any options we haven't seen yet. if they're required
+  unset lopt
+  unset sopt
+  optargs=()
+done
+
+# TODO roll through any options we haven't seen yet. if they're required
 # throw an error, otherwise set them to the default value and add to the
 # output array
-# TODO
 
-# }}}
-
-# print the code to be eval'd including any unprocessed arguments as an
-# args array
-printf "%s\n" "${output[@]}"
+printf "%s\n" "${output[@]}" # code to be eval'd
 [[ "$#" -ne 0 ]] && echo "args=( $(printf '"%s" ' "$@"))"
 
 exit 0
