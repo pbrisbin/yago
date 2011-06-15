@@ -113,17 +113,13 @@ consume_args() { # {{{
   local nexpd="$1" nseen=0; shift
 
   while [[ -n "$1" && ! "$1" =~ -.* ]]; do
-    optargs+=( "$1" ); shift
-
     nseen=$((nseen+1))
-    if [[ "$nexpd" != 'N' ]]; then
-      [[ $nseen -eq $nexpd ]] && return $nseen
-      [[ $nseen -gt $nexpd ]] && extra_argument "--$lopt"
-    fi
+    [[ "$nexpd" != 'N' && $nseen -gt $nexpd ]] && extra_argument "--$lopt"
+
+    optargs+=( "$1" ); shift
   done
 
-  # if we get here and it's not an N option, we didn't get enough
-  [[ "$nexpd" != 'N' ]] && missing_argument "--$lopt"
+  [[ "$nexpd" != 'N' && $nseen -ne $nexpd ]] && missing_argument "--$lopt"
 
   return $nseen
 } # }}}
