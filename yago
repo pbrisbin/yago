@@ -26,6 +26,8 @@ set_values() { # {{{
   lopts_list=()
 
   for arg in "${opts[@]}"; do
+    [[ -z "$arg" ]] && continue
+
     IFS=',' read -a parse_info <<< "$arg"
     n="${#parse_info[@]}"
 
@@ -207,6 +209,12 @@ while [[ -n "$1" ]]; do
   fi
 done
 
+if [[ "${#optargs[@]}" -ne 0 ]]; then
+  # TODO check for not enough or too many
+  output+=( "$lopt=( $(printf '"%s" ' "${optargs[@]}"))" )
+  eval "$lopt[7]=true"
+fi
+
 # roll through any options we haven't seen yet. if they're required
 # throw an error, otherwise set them to the default value and add to the
 # output array
@@ -216,3 +224,5 @@ done
 # args array
 printf "%s\n" "${output[@]}"
 [[ "$#" -ne 0 ]] && echo "args=( $(printf '"%s" ' "$@"))"
+
+exit 0
