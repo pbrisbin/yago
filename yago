@@ -221,7 +221,7 @@ while [[ -n "$1" ]]; do
 done
 
 if [[ "${#optargs[@]}" -ne 0 ]]; then
-  if [[ $nargs -eq 0 ]]; then
+  if [[ "$nargs" != 'N' && $nargs -eq 0 ]]; then
     output+=( "$lopt=( $(printf '"%s" ' "${optargs[@]}"))" )
     eval "$lopt[7]=true"
   fi
