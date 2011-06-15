@@ -53,21 +53,43 @@ set_values() { # {{{
     eval "$long_opt=( \"$short_opt\" \"$opt_message\" \"$default\" \"$nargs\" \"$argument\" \"$variable\" $required false)"
 
     # clear variables for next option
-    unset long_opt
-    unset short_opt
-    unset opt_message
-    unset default
-    unset nargs
-    unset argument
-    unset variable
-    unset required
+    unset long_opt short_opt opt_message default nargs argument variable \
+      required
   done
 } # }}}
 
 help_message() { # {{{
-  # TODO, fix this
-  echo "usage: $progname ..." >&2
+  local long_opt short_opt opt_message nargs argument required \
+    lb rb sopt usage options_list
+
+  # TODO it appears associative arrays are stored in the reverse order
+  # they're declared. this may not be true, but i use it to print the
+  # help in the order it was defined
+  for long_opt in ${!lopts_list[@]}; do
+    eval "short_opt=\${$long_opt[0]}"
+    eval "opt_message=\${$long_opt[1]}"
+    eval "nargs=\${$long_opt[3]}"
+    eval "argument=\${$long_opt[4]}"
+    eval "required=\${$long_opt[6]}"
+
+    $required || { lb='[ '; rb=' ]'; }
+
+    case "$nargs" in # compare as string
+      '0') sopt="$lb-$short_opt$rb"              ; argument=''              ;;
+      '1') sopt="$lb-$short_opt $argument$rb"                               ;;
+      *)   sopt="$lb-$short_opt $argument ...$rb"; argument="$argument ..." ;;
+    esac
+
+    usage="$sopt $usage"
+    options_list=( "$(printf "    %-25.25s %s" "-$short_opt, --$long_opt$argument" "$opt_message")" "${options_list[@]}" )
+
+    unset short_opt opt_message nargs argument required lb rb sopt lopt
+  done
+
+  echo "usage: $progname $usage" >&2
+  printf "%s\n" "${options_list[@]}" >&2
   echo "exit 1"
+
   exit 0
 } # }}}
 
@@ -104,6 +126,11 @@ consume_args() { # {{{
   [[ "$nexpd" != 'N' ]] && missing_argument "--$lopt"
 
   return $nseen
+} # }}}
+
+set_unseen_args() { # {{{
+  # TODO
+  return 0
 } # }}}
 
 declare -a opts
@@ -150,16 +177,14 @@ while [[ -n "$1" ]]; do
 
   declare $lopt[7]=true
 
-  unset nargs
-  unset ret
-  unset lopt
-  unset sopt
+  unset nargs ret lopt sopt
   optargs=()
 done
 
-# TODO: roll through any options we haven't seen yet. if they're
-# required throw an error, otherwise set them to the default value and
-# add to the output array
+# roll through any options we haven't seen yet. if they're required
+# throw an error, otherwise set them to the default value and add to the
+# output array
+set_unseen_args
 
 printf "%s\n" "${output[@]}" # code to be eval'd
 [[ "$#" -ne 0 ]] && echo "args=( $(printf '"%s" ' "$@"))"
