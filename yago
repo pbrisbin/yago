@@ -165,10 +165,9 @@ while [[ -n "$1" ]]; do
     # fill optargs and return the number of arguments which were
     # consumed by the process. error on too few or too many
     consume_args "$nargs" "$@"
-    ret=$?
+    shift $? # move passed
 
     output+=( "$lopt=( $(printf '"%s" ' "${optargs[@]}"))" )
-    shift $ret # move passed
   fi
 
   declare $lopt[7]=true
@@ -177,12 +176,13 @@ while [[ -n "$1" ]]; do
   optargs=()
 done
 
+# any leftover args get placed in an args array
+[[ "$#" -ne 0 ]] && output+=(  "args=( $(printf '"%s" ' "$@"))" )
+
 # roll through any options we haven't seen yet. if they're required
 # throw an error, otherwise set them to the default value and add to the
 # output array
 set_unseen_args
 
-printf "%s\n" "${output[@]}" # code to be eval'd
-[[ "$#" -ne 0 ]] && echo "args=( $(printf '"%s" ' "$@"))"
-
+printf "%s\n" "${output[@]}"
 exit 0
