@@ -10,9 +10,10 @@ errorout() { # {{{
 } # }}}
 
 invalid_option()   { errorout 2 "invalid option $1"      ; }
-duplicate_option() { errorout 3 "duplicate option $1 "   ; }
-missing_argument() { errorout 4 "missing argument for $1"; }
-extra_argument()   { errorout 5 "extra argument for $1"  ; }
+missing_option()   { errorout 3 "option $1 is required" ; }
+duplicate_option() { errorout 4 "duplicate option $1 "   ; }
+missing_argument() { errorout 5 "missing argument for $1"; }
+extra_argument()   { errorout 6 "extra argument for $1"  ; }
 
 set_values() { # {{{
   local parse_info arg n
@@ -120,13 +121,28 @@ consume_args() { # {{{
   done
 
   [[ "$nexpd" != 'N' && $nseen -ne $nexpd ]] && missing_argument "--$lopt"
+  [[ "$nexpd" == 'N' && $nseen -eq 0      ]] && missing_argument "--$lopt"
 
   return $nseen
 } # }}}
 
 set_unseen_args() { # {{{
-  # TODO
-  return 0
+  local lopt required seen default nargs
+
+  for lopt in "${!lopts_list[@]}"; do
+    eval "default=\${$lopt[2]}"
+    eval "nargs=\${$lopt[3]}"
+    eval "required=\${$lopt[6]}"
+    eval "seen=\${$lopt[7]}"
+
+    $seen     && continue
+    $required && missing_option "--$lopt"
+
+    case "$nargs" in
+      0) output+=( "$lopt=$default" )     ;;
+      *) output+=( "$lopt=( $default )" ) ;;
+    esac
+  done
 } # }}}
 
 declare -a opts
