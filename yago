@@ -37,7 +37,7 @@ __set_values() { # {{{
     read -r short_opt   <<< "${parse_info[1]}"
     read -r opt_message <<< "${parse_info[2]}"
 
-    [[ $n -ge 4 ]] && read -r default  <<< "$default"         || default=false
+    [[ $n -ge 4 ]] && read -r default  <<< "${parse_info[3]}" || default=false
     [[ $n -ge 5 ]] && read -r nargs    <<< "${parse_info[4]}" || nargs=0
     [[ $n -ge 6 ]] && read -r argument <<< "${parse_info[5]}" || argument='<ARG>'
     [[ $n -ge 7 ]] && read -r variable <<< "${parse_info[6]}" || variable="$long_opt"
