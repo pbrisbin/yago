@@ -4,18 +4,18 @@
 #
 ###
 
-errorout() { # {{{
+__errorout() { # {{{
   local errno=$1; shift
   echo "error: $*" >&2; exit $errno
 } # }}}
 
-invalid_option()   { errorout 2 "invalid option $1"      ; }
-missing_option()   { errorout 3 "option $1 is required" ; }
-duplicate_option() { errorout 4 "duplicate option $1 "   ; }
-missing_argument() { errorout 5 "missing argument for $1"; }
-extra_argument()   { errorout 6 "extra argument for $1"  ; }
+__invalid_option()   { __errorout 2 "invalid option $1"      ; }
+__missing_option()   { __errorout 3 "option $1 is required"  ; }
+__duplicate_option() { __errorout 4 "duplicate option $1 "   ; }
+__missing_argument() { __errorout 5 "missing argument for $1"; }
+__extra_argument()   { __errorout 6 "extra argument for $1"  ; }
 
-set_values() { # {{{
+__set_values() { # {{{
   local parse_info arg n
 
   local long_opt short_opt opt_message default nargs argument \
@@ -30,21 +30,21 @@ set_values() { # {{{
     IFS=',' read -a parse_info <<< "$arg"
     n="${#parse_info[@]}"
 
-    [[ $n -lt 3 || $n -gt 7 ]] && errorout 1 'invalid number of tokens in option definiton'
+    [[ $n -lt 3 || $n -gt 7 ]] && __errorout 1 'invalid number of tokens in option definiton'
 
-    # todo: trim whitespace more efficiently
-    long_opt=$(   echo ${parse_info[0]})
-    short_opt=$(  echo ${parse_info[1]})
-    opt_message=$(echo ${parse_info[2]})
+    # reread vars to trim whitespace
+    read -r long_opt    <<< "${parse_info[0]}"
+    read -r short_opt   <<< "${parse_info[1]}"
+    read -r opt_message <<< "${parse_info[2]}"
 
-    [[ $n -ge 4 ]] && default=$( echo ${parse_info[3]}) || default=false
-    [[ $n -ge 5 ]] && nargs=$(   echo ${parse_info[4]}) || nargs=0
-    [[ $n -ge 6 ]] && argument=$(echo ${parse_info[5]}) || argument='<ARG>'
-    [[ $n -ge 7 ]] && variable=$(echo ${parse_info[6]}) || variable="$long_opt"
+    [[ $n -ge 4 ]] && read -r default  <<< "$default"         || default=false
+    [[ $n -ge 5 ]] && read -r nargs    <<< "${parse_info[4]}" || nargs=0
+    [[ $n -ge 6 ]] && read -r argument <<< "${parse_info[5]}" || argument='<ARG>'
+    [[ $n -ge 7 ]] && read -r variable <<< "${parse_info[6]}" || variable="$long_opt"
 
     [[ -n "$default" && "$default" != 'REQUIRED' ]] && required=false || required=true
 
-    [[ "$nargs" != 'N' && -n "${nargs//[0-9]/}" ]] && errorout 1 "invalid number of arguments, token was \`$nargs'"
+    [[ "$nargs" != 'N' && -n "${nargs//[0-9]/}" ]] && __errorout 1 "invalid number of arguments, token was \`$nargs'"
 
     # add to a list of keys
     sopts_list[$short_opt]="$long_opt"
@@ -59,7 +59,7 @@ set_values() { # {{{
   done
 } # }}}
 
-help_message() { # {{{
+__help_message() { # {{{
   local long_opt short_opt opt_message nargs argument required \
     lb rb sopt usage options_list
 
@@ -89,44 +89,42 @@ help_message() { # {{{
 
   echo "usage: $progname $usage" >&2
   printf "%s\n" "${options_list[@]}" >&2
-  echo "exit 1"
-
-  exit 0
+  exit 1
 } # }}}
 
-setup_short_opt() { # {{{
+__setup_short_opt() { # {{{
   sopt="${1/-/}"
   lopt="${sopts_list[$sopt]}"
 
-  [[ -z "$lopt" ]]    && invalid_option "-$sopt"
-  eval "\${$lopt[7]}" && duplicate_option "-$sopt"
+  [[ -z "$lopt" ]]    && __invalid_option "-$sopt"
+  eval "\${$lopt[7]}" && __duplicate_option "-$sopt"
 } # }}}
 
-setup_long_opt() { # {{{
+__setup_long_opt() { # {{{
   lopt="${1/--/}"
   sopt="${lopts_list[$lopt]}"
 
-  [[ -z "$sopt" ]]    && invalid_option "--$lopt"
-  eval "\${$lopt[7]}" && duplicate_option "--$lopt"
+  [[ -z "$sopt" ]]    && __invalid_option "--$lopt"
+  eval "\${$lopt[7]}" && __duplicate_option "--$lopt"
 } # }}}
 
-consume_args() { # {{{
+__consume_args() { # {{{
   local nexpd="$1" nseen=0; shift
 
   while [[ -n "$1" && ! "$1" =~ -.* ]]; do
     nseen=$((nseen+1))
-    [[ "$nexpd" != 'N' && $nseen -gt $nexpd ]] && extra_argument "--$lopt"
+    [[ "$nexpd" != 'N' && $nseen -gt $nexpd ]] && __extra_argument "--$lopt"
 
     optargs+=( "$1" ); shift
   done
 
-  [[ "$nexpd" != 'N' && $nseen -ne $nexpd ]] && missing_argument "--$lopt"
-  [[ "$nexpd" == 'N' && $nseen -eq 0      ]] && missing_argument "--$lopt"
+  [[ "$nexpd" != 'N' && $nseen -ne $nexpd ]] && __missing_argument "--$lopt"
+  [[ "$nexpd" == 'N' && $nseen -eq 0      ]] && __missing_argument "--$lopt"
 
   return $nseen
 } # }}}
 
-set_unseen_args() { # {{{
+__set_unseen_args() { # {{{
   local lopt required seen default nargs
 
   for lopt in "${!lopts_list[@]}"; do
@@ -136,69 +134,70 @@ set_unseen_args() { # {{{
     eval "seen=\${$lopt[7]}"
 
     $seen     && continue
-    $required && missing_option "--$lopt"
+    $required && __missing_option "--$lopt"
 
     case "$nargs" in
-      0) output+=( "$lopt=$default" )     ;;
-      *) output+=( "$lopt=( $default )" ) ;;
+      0) eval "$lopt=$default"     ;;
+      *) eval "$lopt=( $default )" ;;
     esac
   done
 } # }}}
 
+yago_parse() {
+  # store the program name to be used by the help message as well as the
+  # string we need to parse into the options structures.
+  progname="$1"; shift
+  ifs=$IFS; IFS=$'\n' opts=( $1 ); IFS=$ifs; shift;
+
+  # set two key value arrays which map valid long to short options and
+  # valid short to long options (to make lookups either way convenient) as
+  # well as an array named for each long option which holds all of the
+  # information about it: short opt, message, default, required, etc.
+  __set_values
+
+  while [[ -n "$1" ]]; do
+    case "$1" in
+      -h|--help) __help_message         ;;
+      --)        shift; break           ;;
+      --*)       __setup_long_opt  "$1" ;;
+      -*)        __setup_short_opt "$1" ;;
+      *)         break ;; # unconsumed arg
+    esac
+    shift
+
+    eval "nargs=\${$lopt[3]}"
+
+    if [[ "$nargs" != 'N' && $nargs -eq 0 ]]; then
+      eval "$lopt=true"
+    else
+      # fill optargs and return the number of arguments which were
+      # consumed by the process. error on too few or too many
+      __consume_args "$nargs" "$@" || shift $?
+      eval "$lopt=( $(printf '"%s" ' "${optargs[@]}"))"
+    fi
+
+    # note that you've seen this option
+    declare $lopt[7]=true
+
+    unset nargs ret lopt sopt
+    optargs=()
+  done
+
+  # any leftover args get placed in an args array
+  [[ "$#" -ne 0 ]] && eval "args=( $(printf '"%s" ' "$@"))"
+
+  # roll through any options we haven't seen yet. if they're required
+  # throw an error, otherwise set them to the default value and add to the
+  # output array
+  __set_unseen_args
+
+  # unset the variables we've used as to not pollute the caller
+  unset progname opts optargs sopts_list lopts_list
+
+  return 0;
+}
+
 declare -a opts
 declare -a optargs
-declare -a output
-
 declare -A sopts_list
 declare -A lopts_list
-
-# store the program name to be used by the help message as well as the
-# string we need to parse into the options structures.
-progname="$1"; shift
-ifs=$IFS; IFS=$'\n' opts=( $1 ); IFS=$ifs; shift;
-
-# set two key value arrays which map valid long to short options and
-# valid short to long options (to make lookups either way convenient) as
-# well as an array named for each long option which holds all of the
-# information about it: short opt, message, default, required, etc.
-set_values
-
-while [[ -n "$1" ]]; do
-  case "$1" in
-    -h|--help) help_message         ;;
-    --)        shift; break         ;;
-    --*)       setup_long_opt  "$1" ;;
-    -*)        setup_short_opt "$1" ;;
-    *)         break ;; # unconsumed arg
-  esac
-  shift
-
-  eval "nargs=\${$lopt[3]}"
-
-  if [[ "$nargs" != 'N' && $nargs -eq 0 ]]; then
-    output+=( "$lopt=true" )
-  else
-    # fill optargs and return the number of arguments which were
-    # consumed by the process. error on too few or too many
-    consume_args "$nargs" "$@"
-    shift $? # move passed
-
-    output+=( "$lopt=( $(printf '"%s" ' "${optargs[@]}"))" )
-  fi
-
-  declare $lopt[7]=true
-
-  unset nargs ret lopt sopt
-  optargs=()
-done
-
-# any leftover args get placed in an args array
-[[ "$#" -ne 0 ]] && output+=(  "args=( $(printf '"%s" ' "$@"))" )
-
-# roll through any options we haven't seen yet. if they're required
-# throw an error, otherwise set them to the default value and add to the
-# output array
-set_unseen_args
-
-printf "%s\n" "${output[@]}"
-exit 0
