@@ -20,7 +20,7 @@ Define your script's options and their nature in a single string.
 
 Newlines are used to separate options and commas are used to separate 
 the different attributes of each option. These values must be escaped if 
-used not as a delimitation.
+not used as a delimitation.
 
 At minimum, one option with three values must be defined:
 
@@ -38,7 +38,7 @@ for argument-less options is `false`).
 Note: the long option will become a variable in your script so it is 
 subject to any limitations bash places on variable names (for now).
 
-Passing `-h` or `--help` to would print and automatically generated help 
+Passing `-h` or `--help` to would print an automatically generated help 
 message:
 
 ~~~ 
@@ -113,7 +113,7 @@ source yago
 
 yago_parse 'testprog' "$opts" "$@"
 
-# continue program knowing that options have been parsed and variable 
+# continue program knowing that options have been parsed and variables 
 # have been set according the your $opts declaration...
 ~~~
 
@@ -142,7 +142,7 @@ Bash 4 for associative arrays.
 
 ### TODO
 
-* support grouped options like (think `ls -la`)
+* support grouped options (think `ls -la`)
 * implement custom variables (like `n_size` in the example)
 * think through various required/optional scenarios
 * test more non-best-case scenarios (beef up example.sh for automated 
