@@ -64,8 +64,8 @@ __help_message() { # {{{
     lb rb sopt usage options_list
 
   # TODO it appears associative arrays are stored in the reverse order
-  # they're declared. this may not be true, but i use it to print the
-  # help in the order it was defined
+  # they're declared. this may not be true, but i rely on it it to print
+  # the help in the order it was defined
   for long_opt in ${!lopts_list[@]}; do
     eval "short_opt=\${$long_opt[0]}"
     eval "opt_message=\${$long_opt[1]}"
@@ -87,7 +87,7 @@ __help_message() { # {{{
     unset short_opt opt_message nargs argument required lb rb sopt lopt
   done
 
-  echo "usage: $progname $usage" >&2
+  echo "usage: $progname $usage"     >&2
   printf "%s\n" "${options_list[@]}" >&2
   exit 1
 } # }}}
@@ -144,8 +144,6 @@ __set_unseen_args() { # {{{
 } # }}}
 
 yago_parse() {
-  # store the program name to be used by the help message as well as the
-  # string we need to parse into the options structures.
   progname="$1"; shift
 
   # read options definition from stdin
@@ -191,8 +189,7 @@ yago_parse() {
   [[ "$#" -ne 0 ]] && eval "args=( $(printf '"%s" ' "$@"))"
 
   # roll through any options we haven't seen yet. if they're required
-  # throw an error, otherwise set them to the default value and add to the
-  # output array
+  # throw an error, otherwise set them to the default value
   __set_unseen_args
 
   # unset the variables we've used as to not pollute the caller
