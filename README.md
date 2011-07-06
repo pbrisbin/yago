@@ -16,12 +16,11 @@ an automatic help message.
 
 ### Terse usage
 
-*Note: I need to rewrite this section re: the new use of stderr, stdout, 
-and exit statuses. For now, see the Example section.*
+Define your script's options and their nature in a single string.
 
-The idea is to define your script's options and their nature in a single 
-string. Newlines are used to separate options and commas are used to 
-separate the different attributes of each option.
+Newlines are used to separate options and commas are used to separate 
+the different attributes of each option. These values must be escaped if 
+used not as a delimitation.
 
 At minimum, one option with three values must be defined:
 
@@ -31,9 +30,16 @@ opts='some_flag, s, a simple flag'
 
 This option is a simple boolean flag. Passing `--some_flag` or `-s` to 
 your script should result in the variable `$some_flag` being set to
-`true` when you `eval` the output of `yago 'myprog' "$opts" "$@"`.
+`true` when you execute `yago_parse 'myprog' "$opts" -s`.
 
-Passing `-h` or `--help` to your script would print
+If omitted, the default value will be assigned to the variable (which 
+for argument-less options is `false`).
+
+Note: the long option will become a variable in your script so it is 
+subject to any limitations bash places on variable names (for now).
+
+Passing `-h` or `--help` to would print and automatically generated help 
+message:
 
 ~~~ 
 usage: myprog [ -s ]
@@ -43,19 +49,20 @@ options:
 
 ~~~
 
-Even a complex parse becomes very short.
+Through this system, even a complex parse becomes very short.
 
 ~~~ { .bash }
 opts='
-quiet, q, output less crap
-files, f, list of files to process , REQUIRED, N, FILE
-size , s, desired output size\, ok?, 150     , 1, SIZE, n_size
+
+    quiet, q, output less crap
+    files, f, list of files to process , REQUIRED, N, FILE
+    size , s, desired output size\, ok?, 150     , 1, SIZE, n_size
+
 '
 ~~~
 
-Whitespace is trimmed so you're free to align things as desired. Be sure 
-to escape any commas or newlines that you do not want to signify an 
-option or attribute delimitation.
+Whitespace is trimmed so you're free to align things as desired for 
+readability.
 
 This version defines 3 options.
 
@@ -76,7 +83,7 @@ omitted (and the option takes arguments), it defaults to `<ARG>`.
 Ellipsis are also added if the option accepts 2 or more arguments.
 
 The final field can be used to specify an alternative variable in which 
-to store the value.
+to store the value (this feature is not implemented yet).
 
 Passing `-h` or `--help` would show the following:
 
@@ -91,40 +98,32 @@ options:
 
 When the program sees a `--` or an argument that doesn't belong 
 elsewhere, processing stops and the remaining values are placed in an 
-`args` array.
+`args` array. You are free to use or ignore these extra values.
 
 ### Example
 
-The script uses `stderr` for information and error messages, `stdout` 
-for printing strings that should be `eval`d by your program, and a 
-non-zero exit status to signal that you should **not** `eval` the output 
-but rather exit or otherwise handle some error.
-
-Therefore, typical usage would be:
+Typical usage would be:
 
 ~~~ { .bash }
-output="$(yago 'testprog' "$opts" "$@")" && eval "$output" || handle_error
+#!/bin/bash
+
+opts=' ... '
+
+source yago
+
+yago_parse 'testprog' "$opts" "$@"
+
+# continue program knowing that options have been parsed and variable 
+# have been set according the your $opts declaration...
 ~~~
-
-where `handle_error` does whatever you need, or simply `exit`s.
-
-`yago`'s `stdout` can be silenced if you want to print your own errors. 
-The non-zero exit status is meaningful (a list will be added here soon).
-
-Note: when `yago` sees an `-h` or `--help` option, it will print the 
-help message on `stderr`, "exit 1" on `stdout`, and still exits with a 
-**zero** status itself. This will show the message to the user and tell 
-your program to go ahead and `eval "exit 1"` to terminate.
-
-*Not all of this is implemented yet, but that's the idea*
 
 So, given our example option string, the following call:
 
 ~~~ { .bash }
-./yago 'testprog' "$opts" -f foo bar -s 10 -q some extra args
+yago_parse 'testprog' "$opts" -f foo bar -s 10 -q some extra args
 ~~~
 
-Would output
+Would be exactly equivalent to doing
 
 ~~~ 
 files=( "foo" "bar" )
@@ -133,7 +132,9 @@ quiet=true
 args=( "some" "extra" "args" )
 ~~~
 
-Which, when `eval`ed, would set the variables for use in the script.
+directly.
+
+Please read and play with `./example.sh` for the most up to date usage example.
 
 ### Requirements
 
@@ -141,4 +142,8 @@ Bash 4 for associative arrays.
 
 ### TODO
 
-A lot...
+* support grouped options like (think `ls -la`)
+* implement custom variables (like `n_size` in the example)
+* think through various required/optional scenarios
+* test more non-best-case scenarios (beef up example.sh for automated 
+  testing)
