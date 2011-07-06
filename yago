@@ -82,7 +82,7 @@ __help_message() { # {{{
     esac
 
     usage="$sopt $usage"
-    options_list=( "$(printf "    %-25.25s %s" "-$short_opt, --$long_opt$argument" "$opt_message")" "${options_list[@]}" )
+    options_list=( "$(printf "    %-25.25s %s" "-$short_opt, --$long_opt $argument" "$opt_message")" "${options_list[@]}" )
 
     unset short_opt opt_message nargs argument required lb rb sopt lopt
   done
@@ -147,7 +147,11 @@ yago_parse() {
   # store the program name to be used by the help message as well as the
   # string we need to parse into the options structures.
   progname="$1"; shift
-  ifs=$IFS; IFS=$'\n' opts=( $1 ); IFS=$ifs; shift;
+
+  # read options definition from stdin
+  while IFS=$'\n' read -r line; do
+    [[ -n "$line" ]] && opts+=( "$line" )
+  done
 
   # set two key value arrays which map valid long to short options and
   # valid short to long options (to make lookups either way convenient) as
