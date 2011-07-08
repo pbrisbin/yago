@@ -95,5 +95,4 @@ leftover args are baz bat
 
 ### TODO
 
-* grouped options
 * implement custom variable
