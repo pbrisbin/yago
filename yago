@@ -51,7 +51,7 @@ __set_values() { # {{{
     lopts_list[$long_opt]="$short_opt"
 
     # create an "extension table" of parameters, last field is "seen"
-    eval "$long_opt=( \"$short_opt\" \"$opt_message\" \"$default\" \"$nargs\" \"$argument\" \"$variable\" $required false)"
+    eval "${long_opt}_o=( \"$short_opt\" \"$opt_message\" \"$default\" \"$nargs\" \"$argument\" \"$variable\" $required false)"
 
     # clear variables for next option
     unset long_opt short_opt opt_message default nargs argument variable \
@@ -67,11 +67,11 @@ __help_message() { # {{{
   # they're declared. this may not be true, but i rely on it it to print
   # the help in the order it was defined
   for long_opt in ${!lopts_list[@]}; do
-    eval "short_opt=\${$long_opt[0]}"
-    eval "opt_message=\${$long_opt[1]}"
-    eval "nargs=\${$long_opt[3]}"
-    eval "argument=\${$long_opt[4]}"
-    eval "required=\${$long_opt[6]}"
+    eval "short_opt=\${${long_opt}_o[0]}"
+    eval "opt_message=\${${long_opt}_o[1]}"
+    eval "nargs=\${${long_opt}_o[3]}"
+    eval "argument=\${${long_opt}_o[4]}"
+    eval "required=\${${long_opt}_o[6]}"
 
     $required || { lb='[ '; rb=' ]'; }
 
@@ -96,16 +96,16 @@ __setup_short_opt() { # {{{
   sopt="${1/-/}"
   lopt="${sopts_list[$sopt]}"
 
-  [[ -z "$lopt" ]]    && __invalid_option "-$sopt"
-  eval "\${$lopt[7]}" && __duplicate_option "-$sopt"
+  [[ -z "$lopt" ]]        && __invalid_option "-$sopt"
+  eval "\${${lopt}_o[7]}" && __duplicate_option "-$sopt"
 } # }}}
 
 __setup_long_opt() { # {{{
   lopt="${1/--/}"
   sopt="${lopts_list[$lopt]}"
 
-  [[ -z "$sopt" ]]    && __invalid_option "--$lopt"
-  eval "\${$lopt[7]}" && __duplicate_option "--$lopt"
+  [[ -z "$sopt" ]]        && __invalid_option "--$lopt"
+  eval "\${${lopt}_o[7]}" && __duplicate_option "--$lopt"
 } # }}}
 
 __consume_args() { # {{{
@@ -128,10 +128,10 @@ __set_unseen_args() { # {{{
   local lopt required seen default nargs
 
   for lopt in "${!lopts_list[@]}"; do
-    eval "default=\${$lopt[2]}"
-    eval "nargs=\${$lopt[3]}"
-    eval "required=\${$lopt[6]}"
-    eval "seen=\${$lopt[7]}"
+    eval "default=\${${lopt}_o[2]}"
+    eval "nargs=\${${lopt}_o[3]}"
+    eval "required=\${${lopt}_o[6]}"
+    eval "seen=\${${lopt}_o[7]}"
 
     $seen     && continue
     $required && __missing_option "--$lopt"
@@ -159,6 +159,27 @@ yago_parse() {
   # information about it: short opt, message, default, required, etc.
   __set_values
 
+  declare -a options
+
+  # make the incoming options more parsable. taken from e36freak's
+  # clearcache script
+  while [[ -n "$1" ]]; do
+    case "$1" in
+      -[!-]?*)
+        for ((i=1; i<${#1}; i++)); do
+          options+=( -"${1:i:1}" )
+        done
+        ;;
+        --?*=*) options+=( "${1%%=*}" "${1#*=}") ;;
+      *) options+=( "$1" ) ;;
+    esac
+    shift
+  done
+
+  set -- "${options[@]}"
+
+  unset options
+
   while [[ -n "$1" ]]; do
     case "$1" in
       -h|--help) __help_message         ;;
@@ -169,7 +190,7 @@ yago_parse() {
     esac
     shift
 
-    eval "nargs=\${$lopt[3]}"
+    eval "nargs=\${${lopt}_o[3]}"
 
     if [[ "$nargs" != 'N' && $nargs -eq 0 ]]; then
       eval "$lopt=true"
@@ -181,7 +202,7 @@ yago_parse() {
     fi
 
     # note that you've seen this option
-    declare $lopt[7]=true
+    declare ${lopt}_o[7]=true
 
     unset nargs ret lopt sopt
     optargs=()
