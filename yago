@@ -151,6 +151,8 @@ yago_parse() {
     [[ -n "$line" ]] && opts+=( "$line" )
   done
 
+  [[ "${#opts[@]}" -ne 0 ]] || errorout 1 "no option string"
+
   # set two key value arrays which map valid long to short options and
   # valid short to long options (to make lookups either way convenient) as
   # well as an array named for each long option which holds all of the
